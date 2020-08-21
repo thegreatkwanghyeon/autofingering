@@ -97,12 +97,6 @@ left_num = fingering.decoding(
 right_part["finger_num"] = right_num[1:]
 left_part["finger_num"] = left_num[1:]
 
-with pd.option_context(
-    "display.max_rows", None, "display.max_columns", None
-):  # more options can be specified also
-    print(right_part)
-    print(left_part)
-
 sheet.add_fingernum(0, right_part)
 sheet.add_fingernum(1, left_part)
 
