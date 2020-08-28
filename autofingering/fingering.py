@@ -1,6 +1,64 @@
+import os
 import pandas as pd
 import numpy as np
-from collections import Counter
+from collections import Counter, defaultdict
+
+
+def train_from_file(dir_path, leap_limit=15):
+    file_list = os.listdir(dir_path)
+
+    pig_format = [
+        "id",
+        "onset",
+        "offset",
+        "pitch",
+        "onsetvel",
+        "offsetvel",
+        "hand",
+        "fingernum",
+    ]
+
+    right_init = Counter()
+    right_transition_count = Counter()
+    right_emission = defaultdict(Counter)
+
+    left_init = Counter()
+    left_transition_count = Counter()
+    left_emission = defaultdict(Counter)
+
+    for idx, file in enumerate(file_list):
+        path = dir_path + "/" + file
+        data_size = len(file_list)
+
+        print(f"Processing: {path} ({idx + 1}/{data_size})")
+
+        data = pd.read_csv(path, sep="\t", header=0, names=pig_format)
+
+        if data.fingernum.dtype == object:
+            data.fingernum = data.fingernum.apply(
+                lambda x: x.split("_")[0]
+            ).astype("int")
+
+        left_hand = data[data.fingernum < 0]
+        right_hand = data[data.fingernum > 0]
+
+        init, transition, emission = count_fingering(
+            right_hand, limit=leap_limit
+        )
+        right_init += init
+        right_transition_count += transition
+        for k, counter in emission.items():
+            right_emission[k].update(counter)
+
+        init, transition, emission = count_fingering(
+            left_hand, limit=leap_limit
+        )
+        left_init += init
+        left_transition_count += transition
+        for k, counter in emission.items():
+            left_emission[k].update(counter)
+
+    return (right_init, right_transition_count, right_emission, left_init, left_transition_count, left_emission)
 
 
 def pitch_to_key(pitch: str):
@@ -10,11 +68,17 @@ def pitch_to_key(pitch: str):
     if pitch[1].isdigit():
         posx += (int(pitch[1]) - 4) * 7
     elif pitch[1] == "#":
-        posy = 1
-        posx += (int(pitch[2]) - 4) * 7
+        if pitch[2] == "#":
+            posx += (int(pitch[3]) - 4) * 7 + 1
+        else:
+            posy = 1
+            posx += (int(pitch[2]) - 4) * 7
     elif pitch[1] == "b" or pitch[1] == "-":
-        posy = 1
-        posx += (int(pitch[2]) - 4) * 7 - 1
+        if pitch[2] == "b" or pitch[2] == "-":
+            posx += (int(pitch[3]) - 4) * 7
+        else:
+            posy = 1
+            posx += (int(pitch[2]) - 4) * 7 - 1
 
     return (posx, posy)
 
